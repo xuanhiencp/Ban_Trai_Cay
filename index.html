@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FU SHUN AGRI - Hệ Thống Ghi Cân & Báo Cáo Sầu Riêng</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Reporting -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        },
+                        durian: {
+                            light: '#fefce8',
+                            DEFAULT: '#eab308',
+                            dark: '#ca8a04'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for sleek UI */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Weight chip animation */
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .weight-chip {
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* Print styles for receipt */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white;
+                padding: 20px;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Main App Wrapper -->
+    <div class="min-h-screen flex flex-col lg:flex-row">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="w-full lg:w-64 bg-brand-900 text-white flex flex-col justify-between shrink-0 shadow-xl z-20">
+            <div>
+                <!-- Brand Header -->
+                <div class="p-5 flex items-center gap-3 border-b border-brand-800">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-durian to-brand-500 flex items-center justify-center text-brand-900 font-extrabold text-xl shadow-lg">
+                        <i class="fa-solid fa-leaf"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg tracking-tight leading-tight">FU SHUN AGRI</h1>
+                        <p class="text-xs text-brand-100/70">Thu Mua & Kho Nông Sản</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Menu -->
+                <nav class="p-3 flex lg:flex-col gap-2 overflow-x-auto">
+                    <button onclick="switchTab('weighing')" id="nav-weighing" class="nav-btn active flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all bg-brand-700 text-white shadow-sm whitespace-nowrap">
+                        <i class="fa-solid fa-scale-balanced w-5 text-center text-durian"></i>
+                        <span>Phiếu Ghi Cân & Tính Tiền</span>
+                    </button>
+                    <button onclick="switchTab('history')" id="nav-history" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-brand-100 hover:bg-brand-800/60 transition-all whitespace-nowrap">
+                        <i class="fa-solid fa-file-invoice-dollar w-5 text-center"></i>
+                        <span>Danh Sách Phiếu Cân</span>
+                        <span id="badge-count" class="ml-auto bg-brand-600 text-white text-xs py-0.5 px-2 rounded-full">2</span>
+                    </button>
+                    <button onclick="switchTab('reports')" id="nav-reports" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-brand-100 hover:bg-brand-800/60 transition-all whitespace-nowrap">
+                        <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+                        <span>Báo Cáo & Thống Kê</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Company Info Footer -->
+            <div class="hidden lg:block p-4 m-3 rounded-xl bg-brand-800/50 border border-brand-700/50 text-xs text-brand-100/80 space-y-1.5">
+                <p class="font-semibold text-white"><i class="fa-solid fa-building mr-1.5 text-durian"></i>CÔNG TY TNHH NÔNG SẢN FU SHUN</p>
+                <p><i class="fa-solid fa-location-dot mr-1.5"></i>Thôn 4, Xã Ea Đrăng, Đắk Lắk</p>
+                <p><i class="fa-solid fa-phone mr-1.5"></i>Hotline: 0929 477 774 (Mr. Mạnh)</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+            
+            <!-- Top Header Bar -->
+            <header class="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10">
+                <div>
+                    <h2 id="page-title" class="text-xl font-bold text-slate-800">Lập Phiếu Ghi Cân Mới</h2>
+                    <p id="page-subtitle" class="text-xs text-slate-500">Nhập mã cân từng sọt/lượt theo phân loại sản phẩm để tự động tính tổng trọng lượng & thành tiền</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="createNewTicket()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Tạo Phiếu Trống</span>
+                    </button>
+                    <button onclick="openPrintModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium shadow-sm shadow-brand-600/20 transition flex items-center gap-2">
+                        <i class="fa-solid fa-print"></i>
+                        <span>Xem & In Phiếu</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- TAB 1: PHIẾU GHI CÂN (WEIGHING STATION & POS) -->
+            <div id="tab-weighing" class="tab-content flex-1 p-4 lg:p-6 overflow-y-auto space-y-6">
+                
+                <!-- Ticket General Metadata Card -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+                    <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-6 bg-brand-600 rounded-full"></span>
+                            <h3 class="font-bold text-slate-800">Thông Tin Chung Phiếu Cân</h3>
+                        </div>
+                        <span id="editing-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                            Đang chỉnh sửa: Phiếu #03 - Vườn 1
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Số Phiếu</label>
+                            <input type="text" id="ticket-number" value="03" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Ngày Cân</label>
+                            <input type="date" id="ticket-date" value="2026-11-24" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Giống Sầu Riêng</label>
+                            <select id="durian-variety" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                <option value="Thái (Monthong)" selected>Sầu riêng Thái (Monthong)</option>
+                                <option value="Ri6">Sầu riêng Ri6</option>
+                                <option value="Musang King">Musang King</option>
+                                <option value="Khác">Giống khác</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Biển Số Xe / Ghi Chú Lô</label>
+                            <input type="text" id="license-plate" placeholder="VD: 47C-123.45" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Tên Vườn / Chủ Vườn (Người Bán) <span class="text-red-500">*</span></label>
+                            <input type="text" id="seller-name" value="Vườn 1 - Nguyễn Thị Hồng" placeholder="Nhập tên chủ vườn..." class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Số Điện Thoại</label>
+                            <input type="text" id="seller-phone" placeholder="09xx xxx xxx" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Số Tài Khoản Ngân Hàng</label>
+                            <input type="text" id="seller-bank-acc" placeholder="Số TK nhận tiền..." class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Ngân Hàng & Người Giới Thiệu</label>
+                            <input type="text" id="seller-bank-name" placeholder="VD: Agribank - Cò A" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Workspace: Weighing Categories + Sticky Summary -->
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+                    
+                    <!-- Left 2 Columns: 5 Product Grade Cards -->
+                    <div class="xl:col-span-2 space-y-5" id="grades-container">
+                        <!-- Rendered dynamically via JS -->
+                    </div>
+
+                    <!-- Right Column: Live Calculation & Checkout Panel -->
+                    <div class="bg-white rounded-2xl p-5 shadow-md border border-slate-200 sticky top-24 space-y-5">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                                <i class="fa-solid fa-calculator text-brand-600"></i>
+                                Tổng Kết Phiếu Cân
+                            </h3>
+                            <span class="text-xs font-medium text-slate-400">Đơn vị: kg / VNĐ</span>
+                        </div>
+
+                        <!-- Breakdown list -->
+                        <div id="summary-breakdown" class="space-y-3 text-sm">
+                            <!-- Dynamic summary rows -->
+                        </div>
+
+                        <!-- Total Weight & Amount Highlight -->
+                        <div class="bg-gradient-to-br from-brand-50 to-emerald-50 rounded-2xl p-4 border border-brand-200/80 space-y-3">
+                            <div class="flex justify-between items-center text-slate-700">
+                                <span class="text-sm font-medium">Tổng số lượt cân (sọt):</span>
+                                <span id="total-baskets" class="font-bold text-slate-900">0 lượt</span>
+                            </div>
+                            <div class="flex justify-between items-center text-slate-700">
+                                <span class="text-sm font-medium">Tổng trọng lượng (A, B, CD, Dạt, Kem):</span>
+                                <span id="grand-total-weight" class="text-xl font-extrabold text-brand-700">0 kg</span>
+                            </div>
+                            <div class="pt-3 border-t border-brand-200/60 flex justify-between items-baseline">
+                                <span class="text-sm font-bold text-slate-800 uppercase">Tổng Thành Tiền:</span>
+                                <span id="grand-total-amount" class="text-2xl font-extrabold text-red-600">0 ₫</span>
+                            </div>
+                        </div>
+
+                        <!-- Staff Signatures Input -->
+                        <div class="grid grid-cols-3 gap-2 pt-1">
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-500 mb-1">Người giao hàng</label>
+                                <input type="text" id="sign-deliverer" placeholder="Ký tên..." class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-500 mb-1">Quản lý kho</label>
+                                <input type="text" id="sign-manager" placeholder="Ký tên..." class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-500 mb-1">Nhân viên cân</label>
+                                <input type="text" id="sign-weigher" placeholder="Ký tên..." class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                            <button onclick="saveCurrentTicket()" class="flex-1 py-3 px-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-lg shadow-brand-600/25 transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                                <span>Lưu Phiếu & Cập Nhật Kho</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: DANH SÁCH PHIẾU CÂN (TICKETS HISTORY) -->
+            <div id="tab-history" class="tab-content hidden flex-1 p-4 lg:p-6 overflow-y-auto space-y-6">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800">Lịch Sử Phiếu Ghi Cân Thu Mua</h3>
+                            <p class="text-xs text-slate-500">Dữ liệu bao gồm các phiếu mẫu từ hình ảnh của bạn và các phiếu mới tạo</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="search-ticket" onkeyup="renderHistoryTable()" placeholder="Tìm theo tên vườn, số phiếu..." class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase bg-slate-50/80">
+                                    <th class="py-3.5 px-4 rounded-tl-xl">Số Phiếu</th>
+                                    <th class="py-3.5 px-4">Ngày Cân</th>
+                                    <th class="py-3.5 px-4">Chủ Vườn / Người Bán</th>
+                                    <th class="py-3.5 px-4">Giống</th>
+                                    <th class="py-3.5 px-4 text-right">Loại A (kg)</th>
+                                    <th class="py-3.5 px-4 text-right">Loại B (kg)</th>
+                                    <th class="py-3.5 px-4 text-right">CD / Dạt / Kem</th>
+                                    <th class="py-3.5 px-4 text-right">Tổng Trọng Lượng</th>
+                                    <th class="py-3.5 px-4 text-right">Thành Tiền</th>
+                                    <th class="py-3.5 px-4 text-center rounded-tr-xl">Thao Tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body" class="divide-y divide-slate-100 text-sm">
+                                <!-- Rendered via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: BÁO CÁO & THỐNG KÊ (ANALYTICS & REPORTS) -->
+            <div id="tab-reports" class="tab-content hidden flex-1 p-4 lg:p-6 overflow-y-auto space-y-6">
+                
+                <!-- Filter Bar -->
+                <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center">
+                            <i class="fa-solid fa-chart-line text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800">Báo Cáo Tổng Hợp Sản Lượng & Doanh Thu</h3>
+                            <p class="text-xs text-slate-500">Thống kê chi tiết theo từng phân loại chất lượng sầu riêng và từng nhà vườn</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select id="report-garden-filter" onchange="updateReports()" class="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="ALL">Tất cả các vườn / phiếu cân</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- KPI Summary Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold uppercase text-slate-400">Tổng Sản Lượng Cân</span>
+                            <span class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center"><i class="fa-solid fa-weight-hanging"></i></span>
+                        </div>
+                        <p id="kpi-total-weight" class="text-2xl font-extrabold text-slate-800">0 kg</p>
+                        <p id="kpi-total-tickets" class="text-xs text-emerald-600 font-medium mt-1">Từ 0 phiếu cân</p>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold uppercase text-slate-400">Tổng Giá Trị Thu Mua</span>
+                            <span class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-sack-dollar"></i></span>
+                        </div>
+                        <p id="kpi-total-revenue" class="text-2xl font-extrabold text-red-600">0 ₫</p>
+                        <p class="text-xs text-slate-500 mt-1">Đã tính theo đơn giá từng loại</p>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold uppercase text-slate-400">Tỷ Lệ Hàng Loại A</span>
+                            <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-award"></i></span>
+                        </div>
+                        <p id="kpi-grade-a-ratio" class="text-2xl font-extrabold text-blue-600">0%</p>
+                        <p id="kpi-grade-a-kg" class="text-xs text-slate-500 mt-1">0 kg đạt chuẩn loại A</p>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold uppercase text-slate-400">Đơn Giá Bình Quân</span>
+                            <span class="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center"><i class="fa-solid fa-tags"></i></span>
+                        </div>
+                        <p id="kpi-avg-price" class="text-2xl font-extrabold text-purple-600">0 ₫/kg</p>
+                        <p class="text-xs text-slate-500 mt-1">Trung bình trên tổng sản lượng</p>
+                    </div>
+                </div>
+
+                <!-- Charts Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Chart 1: Weight distribution by Grade -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <h4 class="font-bold text-slate-800 mb-1">Cơ Cấu Sản Lượng Theo Phân Loại (kg)</h4>
+                        <p class="text-xs text-slate-500 mb-4">So sánh tỷ trọng giữa Sầu loại A, B, CD, Sầu Dạt và Sầu Kem</p>
+                        <div class="h-72 relative flex items-center justify-center">
+                            <canvas id="gradeWeightChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 2: Revenue & Weight by Garden -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <h4 class="font-bold text-slate-800 mb-1">Sản Lượng & Thành Tiền Theo Vườn</h4>
+                        <p class="text-xs text-slate-500 mb-4">Đối chiếu sản lượng thu mua giữa các nhà vườn</p>
+                        <div class="h-72 relative">
+                            <canvas id="gardenComparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Product Category Breakdown Table -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-4">Bảng Chi Tiết Sản Lượng & Doanh Thu Theo Loại Sản Phẩm</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase">
+                                    <th class="py-3 px-4">Phân Loại Sản Phẩm</th>
+                                    <th class="py-3 px-4 text-center">Số Lượt Cân (Sọt)</th>
+                                    <th class="py-3 px-4 text-right">Tổng Trọng Lượng (kg)</th>
+                                    <th class="py-3 px-4 text-right">Tỷ Trọng (%)</th>
+                                    <th class="py-3 px-4 text-right">Đơn Giá TB (VNĐ/kg)</th>
+                                    <th class="py-3 px-4 text-right">Tổng Thành Tiền (VNĐ)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-category-table" class="divide-y divide-slate-100 text-sm">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- PRINT PREVIEW MODAL (Matches the exact structure of Fu Shun paper receipt) -->
+    <div id="print-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 bg-slate-100 border-b border-slate-200 flex items-center justify-between no-print">
+                <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-file-lines text-brand-600"></i>
+                    Xem Trước Phiếu Ghi Cân (Mẫu Chuẩn Fu Shun)
+                </h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="window.print()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-print"></i> In Phiếu Ngay
+                    </button>
+                    <button onclick="closePrintModal()" class="w-9 h-9 rounded-xl bg-white hover:bg-slate-200 text-slate-600 flex items-center justify-center">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body / Printable Area -->
+            <div class="p-6 overflow-y-auto flex-1 bg-slate-50">
+                <div id="print-area" class="bg-white p-6 sm:p-8 border border-slate-300 shadow-sm text-slate-900 font-serif max-w-3xl mx-auto">
+                    <!-- Receipt Content Injected by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. DATA MODEL & INITIAL SEED DATA (FROM IMAGE)
+        // ==========================================
+        const GRADE_CONFIG = [
+            { id: 'A', name: 'Sầu loại A', color: 'emerald', badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200', defaultPrice: 85000, desc: 'Hàng đẹp chuẩn xuất khẩu, đủ hộc, mẫu mã đẹp' },
+            { id: 'B', name: 'Sầu loại B', color: 'blue', badgeBg: 'bg-blue-100 text-blue-800 border-blue-200', defaultPrice: 65000, desc: 'Hàng loại 2, kích cỡ nhỏ hơn hoặc hơi méo nhẹ' },
+            { id: 'CD', name: 'Sầu loại CD', color: 'amber', badgeBg: 'bg-amber-100 text-amber-800 border-amber-200', defaultPrice: 40000, desc: 'Hàng dạt nhẹ, sâu cuốn hoặc sượng nhẹ' },
+            { id: 'DAT', name: 'Sầu DẠT', color: 'orange', badgeBg: 'bg-orange-100 text-orange-800 border-orange-200', defaultPrice: 25000, desc: 'Hàng dạt phân loại riêng' },
+            { id: 'KEM', name: 'Sầu KEM', color: 'purple', badgeBg: 'bg-purple-100 text-purple-800 border-purple-200', defaultPrice: 15000, desc: 'Hàng bóc múi làm kem / chế biến' }
+        ];
+
+        // Exact digits transcribed from the user's handwritten image (Phiếu số 03 - 24/11/2026)
+        const INITIAL_TICKETS = [
+            {
+                id: 'ticket-vuon-1',
+                ticketNumber: '03',
+                date: '2026-11-24',
+                variety: 'Thái (Monthong)',
+                licensePlate: '',
+                sellerName: 'Vườn 1 - Nguyễn Thị Hồng',
+                sellerPhone: '',
+                bankAcc: '',
+                bankName: '',
+                deliverer: '',
+                manager: '',
+                weigher: '',
+                grades: {
+                    A: {
+                        // Col 1: 51,50,50,54,50 (255) | Col 2: 52,53,50,55,52 (262) | Col 3: 50,56,53,50,54 (263) | Col 4: 51,60,52,50,51 (264/263) | Col 5: 51,54,7 (112) | Col 6: 52,37 (89) => Total = 1244 kg
+                        weights: [51, 52, 50, 51, 51, 52, 50, 53, 56, 60, 54, 37, 50, 50, 53, 52, 7, 54, 55, 50, 50, 50, 52, 54, 50],
+                        unitPrice: 85000
+                    },
+                    B: {
+                        // Col 1: 52,52,52,51,50 (257) | Col 2: 55,51,52,51,54 (263) | Col 3: 57,51,63 (171) | Col 4: 52,53 (105) => Total = 796 kg
+                        weights: [52, 55, 57, 52, 52, 51, 51, 53, 52, 52, 63, 51, 51, 50, 54],
+                        unitPrice: 65000
+                    },
+                    CD: {
+                        // Col 1: 51,51,53,12 (167) | Col 2: 38 (38) => Total = 205 kg
+                        weights: [51, 38, 51, 53, 12],
+                        unitPrice: 40000
+                    },
+                    DAT: {
+                        // Col 1: 53,52 (105) => Total = 105 kg
+                        weights: [53, 52],
+                        unitPrice: 25000
+                    },
+                    KEM: {
+                        weights: [],
+                        unitPrice: 15000
+                    }
+                }
+            },
+            {
+                id: 'ticket-vuon-2',
+                ticketNumber: '03-V2',
+                date: '2026-11-24',
+                variety: 'Thái (Monthong)',
+                licensePlate: '',
+                sellerName: 'Vườn 2 - Nguyễn Duy Thanh',
+                sellerPhone: '',
+                bankAcc: '',
+                bankName: '',
+                deliverer: '',
+                manager: '',
+                weigher: '',
+                grades: {
+                    A: {
+                        // Col 1: 54,50,51,52,54 (261) | Col 2: 51,51,52,50,52 (256) | Col 3: 51,37,44 (132) => Total = 649 kg
+                        weights: [54, 51, 51, 50, 51, 37, 51, 52, 44, 52, 50, 54, 52],
+                        unitPrice: 85000
+                    },
+                    B: {
+                        // Col 1: 51,51,54,51,52 (259) | Col 2: 55,53,51,50,56 (265) | Col 3: 55,50,51,52,54 (262) | Col 4: 53,53,53 (159) => Total = 945 kg
+                        weights: [51, 55, 55, 53, 51, 53, 50, 53, 54, 51, 51, 53, 51, 50, 52, 52, 56, 54],
+                        unitPrice: 65000
+                    },
+                    CD: {
+                        // Col 1: 51,51,51,51,53 (257) | Col 2: 52,25 (77) => Total = 334 kg
+                        weights: [51, 52, 51, 25, 51, 51, 53],
+                        unitPrice: 40000
+                    },
+                    DAT: {
+                        // Col 1: 52,55,34 (141) => Total = 141 kg
+                        weights: [52, 55, 34],
+                        unitPrice: 25000
+                    },
+                    KEM: {
+                        weights: [],
+                        unitPrice: 15000
+                    }
+                }
+            }
+        ];
+
+        // Application State
+        let tickets = [];
+        let currentTicket = null;
+        let weightChartInstance = null;
+        let gardenChartInstance = null;
+
+        // ==========================================
+        // 2. INITIALIZATION & STORAGE
+        // ==========================================
+        function initApp() {
+            const saved = localStorage.getItem('fushun_agri_tickets_v1');
+            if (saved) {
+                try {
+                    tickets = JSON.parse(saved);
+                } catch (e) {
+                    tickets = JSON.parse(JSON.stringify(INITIAL_TICKETS));
+                }
+            } else {
+                tickets = JSON.parse(JSON.stringify(INITIAL_TICKETS));
+                saveToLocalStorage();
+            }
+
+            // Load the first ticket (Vườn 1 - Nguyễn Thị Hồng) into the editor by default
+            loadTicketIntoEditor(tickets[0].id);
+            updateBadgeCount();
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('fushun_agri_tickets_v1', JSON.stringify(tickets));
+            updateBadgeCount();
+        }
+
+        function updateBadgeCount() {
+            document.getElementById('badge-count').textContent = tickets.length;
+        }
+
+        // Format currency VNĐ
+        function formatMoney(amount) {
+            return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + ' ₫';
+        }
+
+        function formatNumber(num) {
+            return new Intl.NumberFormat('vi-VN').format(num);
+        }
+
+        // Show custom toast notification (no alert())
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-brand-800 text-white' : (type === 'warning' ? 'bg-amber-600 text-white' : 'bg-red-600 text-white');
+            const icon = type === 'success' ? 'fa-circle-check' : (type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-xmark');
+            
+            toast.className = `${bgColor} px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-sm font-medium transform transition-all duration-300 translate-x-full opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-x-full', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // ==========================================
+        // 3. NAVIGATION TABS
+        // ==========================================
+        function switchTab(tabName) {
+            // Update nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-brand-700', 'text-white', 'shadow-sm');
+                btn.classList.add('text-brand-100', 'hover:bg-brand-800/60');
+            });
+            const activeBtn = document.getElementById(`nav-${tabName}`);
+            activeBtn.classList.add('bg-brand-700', 'text-white', 'shadow-sm');
+            activeBtn.classList.remove('text-brand-100', 'hover:bg-brand-800/60');
+
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+
+            // Update header titles & trigger specific renders
+            if (tabName === 'weighing') {
+                document.getElementById('page-title').textContent = 'Phiếu Ghi Cân & Tính Tiền';
+                document.getElementById('page-subtitle').textContent = 'Nhập mã cân từng sọt/lượt theo phân loại sản phẩm để tự động tính tổng trọng lượng & thành tiền';
+            } else if (tabName === 'history') {
+                document.getElementById('page-title').textContent = 'Danh Sách Phiếu Cân Thu Mua';
+                document.getElementById('page-subtitle').textContent = 'Quản lý toàn bộ các phiếu cân đã lưu, xem lại chi tiết hoặc in phiếu';
+                renderHistoryTable();
+            } else if (tabName === 'reports') {
+                document.getElementById('page-title').textContent = 'Báo Cáo Sản Lượng & Doanh Thu';
+                document.getElementById('page-subtitle').textContent = 'Phân tích tỷ trọng phân loại sầu riêng (A, B, CD, Dạt, Kem) và hiệu quả thu mua';
+                populateGardenFilter();
+                updateReports();
+            }
+        }
+
+        // ==========================================
+        // 4. WEIGHING TICKET EDITOR LOGIC
+        // ==========================================
+        function createNewTicket() {
+            const nextNum = String(tickets.length + 1).padStart(2, '0');
+            const today = new Date().toISOString().split('T')[0];
+            
+            currentTicket = {
+                id: 'ticket-' + Date.now(),
+                ticketNumber: nextNum,
+                date: today,
+                variety: 'Thái (Monthong)',
+                licensePlate: '',
+                sellerName: '',
+                sellerPhone: '',
+                bankAcc: '',
+                bankName: '',
+                deliverer: '',
+                manager: '',
+                weigher: '',
+                grades: {
+                    A: { weights: [], unitPrice: 85000 },
+                    B: { weights: [], unitPrice: 65000 },
+                    CD: { weights: [], unitPrice: 40000 },
+                    DAT: { weights: [], unitPrice: 25000 },
+                    KEM: { weights: [], unitPrice: 15000 }
+                }
+            };
+
+            syncFormFromTicket();
+            renderGradeCards();
+            recalculateTotals();
+            document.getElementById('editing-badge').textContent = `Đang lập phiếu mới: #${nextNum}`;
+            document.getElementById('editing-badge').className = 'px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800';
+            showToast('Đã khởi tạo phiếu ghi cân mới');
+        }
+
+        function loadTicketIntoEditor(ticketId) {
+            const found = tickets.find(t => t.id === ticketId);
+            if (!found) return;
+            currentTicket = JSON.parse(JSON.stringify(found));
+            syncFormFromTicket();
+            renderGradeCards();
+            recalculateTotals();
+            document.getElementById('editing-badge').textContent = `Đang xem/sửa: Phiếu #${currentTicket.ticketNumber} (${currentTicket.sellerName || 'Chưa đặt tên'})`;
+            document.getElementById('editing-badge').className = 'px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800';
+        }
+
+        function syncFormFromTicket() {
+            document.getElementById('ticket-number').value = currentTicket.ticketNumber;
+            document.getElementById('ticket-date').value = currentTicket.date;
+            document.getElementById('durian-variety').value = currentTicket.variety;
+            document.getElementById('license-plate').value = currentTicket.licensePlate;
+            document.getElementById('seller-name').value = currentTicket.sellerName;
+            document.getElementById('seller-phone').value = currentTicket.sellerPhone;
+            document.getElementById('seller-bank-acc').value = currentTicket.bankAcc;
+            document.getElementById('seller-bank-name').value = currentTicket.bankName;
+            document.getElementById('sign-deliverer').value = currentTicket.deliverer;
+            document.getElementById('sign-manager').value = currentTicket.manager;
+            document.getElementById('sign-weigher').value = currentTicket.weigher;
+        }
+
+        function syncTicketFromForm() {
+            currentTicket.ticketNumber = document.getElementById('ticket-number').value.trim() || '00';
+            currentTicket.date = document.getElementById('ticket-date').value;
+            currentTicket.variety = document.getElementById('durian-variety').value;
+            currentTicket.licensePlate = document.getElementById('license-plate').value.trim();
+            currentTicket.sellerName = document.getElementById('seller-name').value.trim();
+            currentTicket.sellerPhone = document.getElementById('seller-phone').value.trim();
+            currentTicket.bankAcc = document.getElementById('seller-bank-acc').value.trim();
+            currentTicket.bankName = document.getElementById('seller-bank-name').value.trim();
+            currentTicket.deliverer = document.getElementById('sign-deliverer').value.trim();
+            currentTicket.manager = document.getElementById('sign-manager').value.trim();
+            currentTicket.weigher = document.getElementById('sign-weigher').value.trim();
+        }
+
+        // Render the 5 Grade Cards (A, B, CD, DAT, KEM)
+        function renderGradeCards() {
+            const container = document.getElementById('grades-container');
+            container.innerHTML = '';
+
+            GRADE_CONFIG.forEach(grade => {
+                const gradeData = currentTicket.grades[grade.id];
+                const totalKg = gradeData.weights.reduce((sum, w) => sum + w, 0);
+                const subtotal = totalKg * gradeData.unitPrice;
+
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-2xl p-5 shadow-sm border border-slate-200/90 transition hover:border-slate-300';
+                
+                // Build weight chips HTML
+                let chipsHtml = '';
+                if (gradeData.weights.length === 0) {
+                    chipsHtml = `<span class="text-xs text-slate-400 italic py-1.5">Chưa có mã cân nào. Nhập số kg vào ô bên dưới và nhấn Enter...</span>`;
+                } else {
+                    chipsHtml = gradeData.weights.map((w, idx) => `
+                        <div class="weight-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 font-bold text-sm group transition">
+                            <span class="text-[10px] font-normal text-slate-400">#${idx + 1}</span>
+                            <span>${w}</span>
+                            <button onclick="removeWeight('${grade.id}', ${idx})" title="Xóa mã cân này" class="text-slate-400 hover:text-red-600 ml-0.5 focus:outline-none">
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                }
+
+                card.innerHTML = `
+                    <!-- Card Header -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2.5">
+                            <span class="px-3 py-1 rounded-lg text-xs font-extrabold border ${grade.badgeBg}">${grade.name}</span>
+                            <span class="text-xs text-slate-400 hidden sm:inline">${grade.desc}</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <span class="text-xs text-slate-500 block">Tổng cộng ${grade.id}:</span>
+                                <span id="grade-kg-${grade.id}" class="text-base font-extrabold text-slate-900">${formatNumber(totalKg)} kg</span>
+                            </div>
+                            <div class="text-right pl-3 border-l border-slate-200">
+                                <span class="text-xs text-slate-500 block">Thành tiền:</span>
+                                <span id="grade-money-${grade.id}" class="text-base font-extrabold text-brand-700">${formatMoney(subtotal)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Weight Chips Grid (Matches the 5-row grid on paper) -->
+                    <div id="chips-container-${grade.id}" class="flex flex-wrap gap-2 min-h-[44px] p-2.5 bg-slate-50/70 rounded-xl border border-dashed border-slate-200 mb-3">
+                        ${chipsHtml}
+                    </div>
+
+                    <!-- Quick Input & Unit Price Row -->
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 flex-1 min-w-[220px]">
+                            <div class="relative flex-1 max-w-[220px]">
+                                <input type="number" step="0.1" min="0.1" id="input-weight-${grade.id}" 
+                                    onkeydown="handleWeightKeydown(event, '${grade.id}')"
+                                    placeholder="Nhập số kg (VD: 52)..." 
+                                    class="w-full pl-3.5 pr-10 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                                <span class="absolute right-3 top-2.5 text-xs font-semibold text-slate-400">kg</span>
+                            </div>
+                            <button onclick="addWeightFromInput('${grade.id}')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-semibold transition flex items-center gap-1.5 shrink-0">
+                                <i class="fa-solid fa-plus text-xs"></i> Thêm
+                            </button>
+                            ${gradeData.weights.length > 0 ? `
+                                <button onclick="clearGradeWeights('${grade.id}')" title="Xóa hết mã cân loại ${grade.id}" class="px-2.5 py-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl text-xs transition">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs font-semibold text-slate-500 whitespace-nowrap">Đơn giá (₫/kg):</label>
+                            <input type="number" step="1000" min="0" value="${gradeData.unitPrice}" 
+                                onchange="updateUnitPrice('${grade.id}', this.value)"
+                                onkeyup="updateUnitPrice('${grade.id}', this.value)"
+                                class="w-32 px-3 py-1.5 bg-amber-50/60 border border-amber-200 rounded-xl text-sm font-bold text-right text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function handleWeightKeydown(event, gradeId) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addWeightFromInput(gradeId);
+            }
+        }
+
+        function addWeightFromInput(gradeId) {
+            const input = document.getElementById(`input-weight-${gradeId}`);
+            const val = parseFloat(input.value);
+            if (isNaN(val) || val <= 0) {
+                showToast('Vui lòng nhập số kg hợp lệ (> 0)', 'warning');
+                input.focus();
+                return;
+            }
+
+            currentTicket.grades[gradeId].weights.push(val);
+            input.value = '';
+            renderGradeCards();
+            recalculateTotals();
+            
+            // Refocus input for rapid continuous weighing entry
+            setTimeout(() => {
+                const newInput = document.getElementById(`input-weight-${gradeId}`);
+                if (newInput) newInput.focus();
+            }, 10);
+        }
+
+        function removeWeight(gradeId, index) {
+            currentTicket.grades[gradeId].weights.splice(index, 1);
+            renderGradeCards();
+            recalculateTotals();
+        }
+
+        function clearGradeWeights(gradeId) {
+            currentTicket.grades[gradeId].weights = [];
+            renderGradeCards();
+            recalculateTotals();
+            showToast(`Đã xóa dữ liệu cân của ${gradeId}`, 'warning');
+        }
+
+        function updateUnitPrice(gradeId, newPrice) {
+            const price = parseFloat(newPrice) || 0;
+            currentTicket.grades[gradeId].unitPrice = price;
+            
+            // Update individual card subtotal without re-rendering whole input
+            const totalKg = currentTicket.grades[gradeId].weights.reduce((s, w) => s + w, 0);
+            const moneyEl = document.getElementById(`grade-money-${gradeId}`);
+            if (moneyEl) moneyEl.textContent = formatMoney(totalKg * price);
+            
+            recalculateTotals();
+        }
+
+        function recalculateTotals() {
+            let totalBaskets = 0;
+            let grandTotalKg = 0;
+            let grandTotalAmount = 0;
+            let breakdownHtml = '';
+
+            GRADE_CONFIG.forEach(grade => {
+                const gData = currentTicket.grades[grade.id];
+                const kg = gData.weights.reduce((s, w) => s + w, 0);
+                const amount = kg * gData.unitPrice;
+
+                totalBaskets += gData.weights.length;
+                grandTotalKg += kg;
+                grandTotalAmount += amount;
+
+                breakdownHtml += `
+                    <div class="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-${grade.color}-500"></span>
+                            <span class="font-medium text-slate-700">${grade.name}</span>
+                            <span class="text-xs text-slate-400">(${gData.weights.length} sọt)</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-bold text-slate-800 mr-2">${formatNumber(kg)} kg</span>
+                            <span class="text-xs font-semibold text-slate-500 block sm:inline">${formatMoney(amount)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('summary-breakdown').innerHTML = breakdownHtml;
+            document.getElementById('total-baskets').textContent = `${totalBaskets} lượt`;
+            document.getElementById('grand-total-weight').textContent = `${formatNumber(grandTotalKg)} kg`;
+            document.getElementById('grand-total-amount').textContent = formatMoney(grandTotalAmount);
+        }
+
+        function saveCurrentTicket() {
+            syncTicketFromForm();
+            if (!currentTicket.sellerName) {
+                showToast('Vui lòng nhập Tên Vườn / Chủ Vườn trước khi lưu!', 'warning');
+                document.getElementById('seller-name').focus();
+                return;
+            }
+
+            const existingIdx = tickets.findIndex(t => t.id === currentTicket.id);
+            if (existingIdx >= 0) {
+                tickets[existingIdx] = JSON.parse(JSON.stringify(currentTicket));
+                showToast(`Đã cập nhật Phiếu #${currentTicket.ticketNumber} (${currentTicket.sellerName})`);
+            } else {
+                tickets.unshift(JSON.parse(JSON.stringify(currentTicket)));
+                showToast(`Đã lưu Phiếu mới #${currentTicket.ticketNumber} vào hệ thống!`);
+            }
+
+            saveToLocalStorage();
+            document.getElementById('editing-badge').textContent = `Đã lưu: Phiếu #${currentTicket.ticketNumber} (${currentTicket.sellerName})`;
+        }
+
+        // ==========================================
+        // 5. TICKETS HISTORY TABLE
+        // ==========================================
+        function getTicketStats(ticket) {
+            let kgA = ticket.grades.A.weights.reduce((s, w) => s + w, 0);
+            let kgB = ticket.grades.B.weights.reduce((s, w) => s + w, 0);
+            let kgCD = ticket.grades.CD.weights.reduce((s, w) => s + w, 0);
+            let kgDAT = ticket.grades.DAT.weights.reduce((s, w) => s + w, 0);
+            let kgKEM = ticket.grades.KEM.weights.reduce((s, w) => s + w, 0);
+            let totalKg = kgA + kgB + kgCD + kgDAT + kgKEM;
+
+            let totalMoney = 
+                (kgA * ticket.grades.A.unitPrice) +
+                (kgB * ticket.grades.B.unitPrice) +
+                (kgCD * ticket.grades.CD.unitPrice) +
+                (kgDAT * ticket.grades.DAT.unitPrice) +
+                (kgKEM * ticket.grades.KEM.unitPrice);
+
+            return { kgA, kgB, kgCD, kgDAT, kgKEM, totalKg, totalMoney };
+        }
+
+        function renderHistoryTable() {
+            const query = document.getElementById('search-ticket').value.toLowerCase();
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+
+            const filtered = tickets.filter(t => 
+                t.sellerName.toLowerCase().includes(query) || 
+                t.ticketNumber.toLowerCase().includes(query) ||
+                t.variety.toLowerCase().includes(query)
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" class="py-8 text-center text-slate-400">Không tìm thấy phiếu cân nào phù hợp.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(t => {
+                const stats = getTicketStats(t);
+                const otherKg = stats.kgCD + stats.kgDAT + stats.kgKEM;
+                
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/90 transition';
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 font-bold text-brand-700">#${t.ticketNumber}</td>
+                    <td class="py-3.5 px-4 text-slate-600">${t.date.split('-').reverse().join('/')}</td>
+                    <td class="py-3.5 px-4 font-semibold text-slate-800">${t.sellerName}</td>
+                    <td class="py-3.5 px-4"><span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 text-xs font-medium">${t.variety}</span></td>
+                    <td class="py-3.5 px-4 text-right font-semibold text-emerald-700">${formatNumber(stats.kgA)}</td>
+                    <td class="py-3.5 px-4 text-right font-semibold text-blue-700">${formatNumber(stats.kgB)}</td>
+                    <td class="py-3.5 px-4 text-right text-slate-600">${formatNumber(otherKg)}</td>
+                    <td class="py-3.5 px-4 text-right font-extrabold text-slate-900">${formatNumber(stats.totalKg)} kg</td>
+                    <td class="py-3.5 px-4 text-right font-extrabold text-red-600">${formatMoney(stats.totalMoney)}</td>
+                    <td class="py-3.5 px-4 text-center">
+                        <div class="inline-flex items-center gap-1.5">
+                            <button onclick="editTicketFromHistory('${t.id}')" title="Mở & Chỉnh sửa" class="px-2.5 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg text-xs font-semibold transition">
+                                <i class="fa-solid fa-pen-to-square"></i> Sửa
+                            </button>
+                            <button onclick="printSpecificTicket('${t.id}')" title="In phiếu" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">
+                                <i class="fa-solid fa-print"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function editTicketFromHistory(id) {
+            loadTicketIntoEditor(id);
+            switchTab('weighing');
+        }
+
+        function printSpecificTicket(id) {
+            loadTicketIntoEditor(id);
+            openPrintModal();
+        }
+
+        // ==========================================
+        // 6. ANALYTICS & REPORTING
+        // ==========================================
+        function populateGardenFilter() {
+            const select = document.getElementById('report-garden-filter');
+            const currentVal = select.value;
+            select.innerHTML = `<option value="ALL">Tất cả các vườn (${tickets.length} phiếu cân)</option>`;
+            
+            tickets.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = `Phiếu #${t.ticketNumber} - ${t.sellerName} (${t.date.split('-').reverse().join('/')})`;
+                select.appendChild(opt);
+            });
+
+            if (Array.from(select.options).some(o => o.value === currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        function updateReports() {
+            const filterId = document.getElementById('report-garden-filter').value;
+            const targetTickets = filterId === 'ALL' ? tickets : tickets.filter(t => t.id === filterId);
+
+            // Aggregate metrics by Grade
+            const gradeAgg = {
+                A: { kg: 0, baskets: 0, money: 0 },
+                B: { kg: 0, baskets: 0, money: 0 },
+                CD: { kg: 0, baskets: 0, money: 0 },
+                DAT: { kg: 0, baskets: 0, money: 0 },
+                KEM: { kg: 0, baskets: 0, money: 0 }
+            };
+
+            let totalKg = 0;
+            let totalMoney = 0;
+
+            targetTickets.forEach(t => {
+                GRADE_CONFIG.forEach(g => {
+                    const gData = t.grades[g.id];
+                    const w = gData.weights.reduce((s, val) => s + val, 0);
+                    const m = w * gData.unitPrice;
+                    
+                    gradeAgg[g.id].kg += w;
+                    gradeAgg[g.id].baskets += gData.weights.length;
+                    gradeAgg[g.id].money += m;
+
+                    totalKg += w;
+                    totalMoney += m;
+                });
+            });
+
+            // Update KPI Cards
+            document.getElementById('kpi-total-weight').textContent = `${formatNumber(totalKg)} kg`;
+            document.getElementById('kpi-total-tickets').textContent = `Tổng hợp từ ${targetTickets.length} phiếu cân`;
+            document.getElementById('kpi-total-revenue').textContent = formatMoney(totalMoney);
+
+            const ratioA = totalKg > 0 ? ((gradeAgg.A.kg / totalKg) * 100).toFixed(1) : 0;
+            document.getElementById('kpi-grade-a-ratio').textContent = `${ratioA}%`;
+            document.getElementById('kpi-grade-a-kg').textContent = `${formatNumber(gradeAgg.A.kg)} kg sầu loại A`;
+
+            const avgPrice = totalKg > 0 ? Math.round(totalMoney / totalKg) : 0;
+            document.getElementById('kpi-avg-price').textContent = `${formatNumber(avgPrice)} ₫/kg`;
+
+            // Update Category Breakdown Table
+            const tbody = document.getElementById('report-category-table');
+            tbody.innerHTML = '';
+            GRADE_CONFIG.forEach(g => {
+                const agg = gradeAgg[g.id];
+                const pct = totalKg > 0 ? ((agg.kg / totalKg) * 100).toFixed(1) : '0.0';
+                const avgGPrice = agg.kg > 0 ? Math.round(agg.money / agg.kg) : 0;
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-bold text-slate-800 flex items-center gap-2">
+                        <span class="px-2.5 py-0.5 rounded-md text-xs border ${g.badgeBg}">${g.name}</span>
+                    </td>
+                    <td class="py-3 px-4 text-center text-slate-600">${agg.baskets} lượt</td>
+                    <td class="py-3 px-4 text-right font-extrabold text-slate-900">${formatNumber(agg.kg)} kg</td>
+                    <td class="py-3 px-4 text-right">
+                        <div class="inline-flex items-center gap-2">
+                            <div class="w-16 bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div class="bg-brand-600 h-full" style="width: ${pct}%"></div>
+                            </div>
+                            <span class="font-semibold text-slate-700 w-11">${pct}%</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-right text-slate-600">${formatNumber(avgGPrice)} ₫</td>
+                    <td class="py-3 px-4 text-right font-bold text-brand-700">${formatMoney(agg.money)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Render Charts
+            renderCharts(gradeAgg, tickets);
+        }
+
+        function renderCharts(gradeAgg, allTickets) {
+            // 1. Doughnut Chart: Weight by Grade
+            const ctx1 = document.getElementById('gradeWeightChart').getContext('2d');
+            if (weightChartInstance) weightChartInstance.destroy();
+
+            weightChartInstance = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: GRADE_CONFIG.map(g => g.name),
+                    datasets: [{
+                        data: GRADE_CONFIG.map(g => gradeAgg[g.id].kg),
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#f97316', '#a855f7'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { font: { family: 'Inter', size: 12 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => ` ${ctx.label}: ${formatNumber(ctx.raw)} kg`
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 2. Bar Chart: Comparison across Gardens
+            const ctx2 = document.getElementById('gardenComparisonChart').getContext('2d');
+            if (gardenChartInstance) gardenChartInstance.destroy();
+
+            const labels = allTickets.map(t => t.sellerName.length > 22 ? t.sellerName.substring(0, 22) + '...' : t.sellerName);
+            const dataA = allTickets.map(t => getTicketStats(t).kgA);
+            const dataB = allTickets.map(t => getTicketStats(t).kgB);
+            const dataOther = allTickets.map(t => {
+                const s = getTicketStats(t);
+                return s.kgCD + s.kgDAT + s.kgKEM;
+            });
+
+            gardenChartInstance = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Loại A (kg)', data: dataA, backgroundColor: '#10b981', borderRadius: 6 },
+                        { label: 'Loại B (kg)', data: dataB, backgroundColor: '#3b82f6', borderRadius: 6 },
+                        { label: 'CD / Dạt / Kem (kg)', data: dataOther, backgroundColor: '#f59e0b', borderRadius: 6 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: { stacked: true, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { family: 'Inter', size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // 7. PRINT RECEIPT MODAL (FU SHUN OFFICIAL FORMAT)
+        // ==========================================
+        function openPrintModal() {
+            syncTicketFromForm();
+            const printArea = document.getElementById('print-area');
+            const stats = getTicketStats(currentTicket);
+            const dateParts = currentTicket.date.split('-');
+            const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : currentTicket.date;
+
+            // Build tables matching the paper layout (5 rows per grade, multiple columns)
+            let gradeTablesHtml = '';
+            GRADE_CONFIG.forEach(g => {
+                const weights = currentTicket.grades[g.id].weights;
+                const unitPrice = currentTicket.grades[g.id].unitPrice;
+                const totalKg = weights.reduce((s, w) => s + w, 0);
+                const totalMoney = totalKg * unitPrice;
+
+                // Arrange weights column-by-column (5 rows per column) just like the handwritten sheet!
+                const numCols = Math.max(10, Math.ceil(weights.length / 5));
+                let rowsHtml = '';
+                for (let r = 0; r < 5; r++) {
+                    let cells = `<td class="border border-slate-800 px-2 py-0.5 text-center font-bold bg-slate-100 w-10">${r + 1}</td>`;
+                    for (let c = 0; c < numCols; c++) {
+                        const idx = c * 5 + r;
+                        const val = weights[idx] !== undefined ? weights[idx] : '';
+                        cells += `<td class="border border-slate-800 px-1.5 py-0.5 text-center font-semibold min-w-[36px]">${val}</td>`;
+                    }
+                    // Last summary column
+                    if (r === 0) {
+                        cells += `<td rowspan="5" class="border border-slate-800 px-2 py-1 text-center font-bold align-middle bg-slate-50 w-24">Tổng:<br><span class="text-base">${formatNumber(totalKg)}</span></td>`;
+                    }
+                    rowsHtml += `<tr>${cells}</tr>`;
+                }
+
+                // Column totals row (TC)
+                let tcCells = `<td class="border border-slate-800 px-2 py-0.5 text-center font-bold bg-slate-100">TC</td>`;
+                for (let c = 0; c < numCols; c++) {
+                    let colSum = 0;
+                    for (let r = 0; r < 5; r++) {
+                        const idx = c * 5 + r;
+                        if (weights[idx] !== undefined) colSum += weights[idx];
+                    }
+                    tcCells += `<td class="border border-slate-800 px-1 py-0.5 text-center font-bold text-xs text-slate-700">${colSum > 0 ? colSum : ''}</td>`;
+                }
+                tcCells += `<td class="border border-slate-800 px-2 py-0.5 text-center font-bold">${formatNumber(totalKg)}</td>`;
+
+                gradeTablesHtml += `
+                    <div class="mb-3">
+                        <table class="w-full border-collapse border border-slate-800 text-xs">
+                            <thead>
+                                <tr class="bg-slate-200">
+                                    <th class="border border-slate-800 px-2 py-1">STT</th>
+                                    <th colspan="${numCols}" class="border border-slate-800 px-2 py-1 text-center uppercase font-bold text-sm">${g.name}</th>
+                                    <th class="border border-slate-800 px-2 py-1">CỘNG</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                                <tr class="bg-slate-50">${tcCells}</tr>
+                            </tbody>
+                        </table>
+                        <div class="flex justify-between items-center text-xs font-bold mt-1 px-1">
+                            <span>Tổng cộng ${g.id}: <span class="underline">${formatNumber(totalKg)} kg</span></span>
+                            <span>Đơn giá: ${formatNumber(unitPrice)} đ/kg</span>
+                            <span>Thành tiền: <span class="text-sm">${formatMoney(totalMoney)}</span></span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            printArea.innerHTML = `
+                <!-- Company Header -->
+                <div class="text-center border-b-2 border-slate-800 pb-3 mb-3">
+                    <h1 class="text-lg sm:text-xl font-bold uppercase tracking-wide">CÔNG TY TNHH NÔNG SẢN FU SHUN</h1>
+                    <p class="text-xs">Địa chỉ: Thôn 4, Xã Ea Đrăng, Tỉnh Đắk Lắk, Việt Nam</p>
+                    <h2 class="text-xl font-extrabold uppercase mt-2">PHIẾU GHI CÂN</h2>
+                </div>
+
+                <!-- Ticket Metadata -->
+                <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs mb-3">
+                    <div><span class="font-bold">Ngày cân:</span> ${formattedDate}</div>
+                    <div><span class="font-bold">Loại sầu riêng:</span> ${currentTicket.variety}</div>
+                    <div><span class="font-bold">Biển số xe:</span> ${currentTicket.licensePlate || '........................'}</div>
+                    <div><span class="font-bold">Chủ vườn / Lô:</span> <span class="font-bold uppercase">${currentTicket.sellerName}</span></div>
+                    <div><span class="font-bold">Số phiếu:</span> <span class="font-bold">${currentTicket.ticketNumber}</span></div>
+                    <div><span class="font-bold">Người giới thiệu:</span> ${currentTicket.bankName || '........................'}</div>
+                </div>
+                <p class="text-[11px] italic mb-2">Liên hệ báo giá: 0962 352252 - Hotline: 0929 477774 - Mr Mạnh</p>
+
+                <!-- 5 Grade Weighing Grids -->
+                ${gradeTablesHtml}
+
+                <!-- Grand Total & Payment Footer -->
+                <div class="border-t-2 border-dashed border-slate-800 pt-2 mt-3 text-xs space-y-1.5">
+                    <div class="flex justify-between items-center text-sm font-extrabold">
+                        <span>Tổng cộng A, B, CD, DẠT, KEM = ${formatNumber(stats.totalKg)} kg</span>
+                        <span>Thành tiền: ${formatMoney(stats.totalMoney)}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <div><span class="font-bold">Họ tên người bán:</span> ${currentTicket.sellerName}</div>
+                        <div><span class="font-bold">Số điện thoại:</span> ${currentTicket.sellerPhone || '........................'}</div>
+                        <div><span class="font-bold">Số Tài khoản:</span> ${currentTicket.bankAcc || '........................'}</div>
+                        <div><span class="font-bold">Ngân hàng:</span> ${currentTicket.bankName || '........................'}</div>
+                    </div>
+                </div>
+
+                <!-- Signatures -->
+                <div class="grid grid-cols-3 text-center text-xs font-bold mt-6 pt-2 pb-10">
+                    <div>
+                        <p>Người giao hàng</p>
+                        <p class="font-normal italic mt-10">${currentTicket.deliverer}</p>
+                    </div>
+                    <div>
+                        <p>Quản lý kho</p>
+                        <p class="font-normal italic mt-10">${currentTicket.manager}</p>
+                    </div>
+                    <div>
+                        <p>Nhân viên cân</p>
+                        <p class="font-normal italic mt-10">${currentTicket.weigher}</p>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('print-modal').classList.remove('hidden');
+        }
+
+        function closePrintModal() {
+            document.getElementById('print-modal').classList.add('hidden');
+        }
+
+        // Start App on Load
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
